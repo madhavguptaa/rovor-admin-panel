@@ -1,27 +1,35 @@
 import { MongoClient, Db } from 'mongodb';
 
-const uri = process.env.MONGODB_URI;
-const dbName = process.env.MONGODB_DB;
 const options: Record<string, unknown> = {};
-
-if (!uri) {
-    throw new Error('Missing MONGODB_URI environment variable');
-}
-
-if (!dbName) {
-    throw new Error('Missing MONGODB_DB environment variable');
-}
 
 const globalForMongo = globalThis as typeof globalThis & {
     _mongoClientPromise?: Promise<MongoClient>;
 };
 
-if (!globalForMongo._mongoClientPromise) {
-    globalForMongo._mongoClientPromise = new MongoClient(uri, options).connect();
+function assertValidEnv(variable: string | undefined, name: string) {
+    if (!variable) {
+        throw new Error(`Missing ${name} environment variable`);
+    }
+    const trimmed = variable.trim();
+    if (!trimmed) {
+        throw new Error(`${name} environment variable is empty`);
+    }
+    return trimmed;
 }
 
 export async function getMongoDb(): Promise<Db> {
-    const client = await globalForMongo._mongoClientPromise!;
+    const uri = assertValidEnv(process.env.MONGODB_URI, 'MONGODB_URI');
+    if (!/^mongodb(\+srv)?:\/\//.test(uri)) {
+        throw new Error('MONGODB_URI must start with "mongodb://" or "mongodb+srv://"');
+    }
+
+    const dbName = assertValidEnv(process.env.MONGODB_DB, 'MONGODB_DB');
+
+    if (!globalForMongo._mongoClientPromise) {
+        globalForMongo._mongoClientPromise = new MongoClient(uri, options).connect();
+    }
+
+    const client = await globalForMongo._mongoClientPromise;
     return client.db(dbName);
 }
 
