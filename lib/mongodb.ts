@@ -12,24 +12,16 @@ if (!dbName) {
     throw new Error('Missing MONGODB_DB environment variable');
 }
 
-declare global {
-    // eslint-disable-next-line no-var
-    var _mongoClientPromise: Promise<MongoClient> | undefined;
-}
+const globalForMongo = globalThis as typeof globalThis & {
+    _mongoClientPromise?: Promise<MongoClient>;
+};
 
-const clientPromise =
-    global._mongoClientPromise ??
-    (async () => {
-        const client = new MongoClient(uri, options);
-        return client.connect();
-    })();
-
-if (!global._mongoClientPromise) {
-    global._mongoClientPromise = clientPromise;
+if (!globalForMongo._mongoClientPromise) {
+    globalForMongo._mongoClientPromise = new MongoClient(uri, options).connect();
 }
 
 export async function getMongoDb(): Promise<Db> {
-    const client = await clientPromise;
+    const client = await globalForMongo._mongoClientPromise!;
     return client.db(dbName);
 }
 
